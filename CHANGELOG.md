@@ -14,7 +14,7 @@ Results of a source audit of all plugin modules (see git history for per-fix det
 - Obok: Kobo Desktop autodetection works on Windows (Python 3) and no longer scans the whole disk / crashes on Linux; serial list edits only reach the preferences on Apply; the legacy cookie key path works; keys are redacted in the log.
 - `aescbc.py` ported to Python 3 bytes (verified against NIST SP 800-38A and PyCryptodome); many smaller py2 leftovers (`unicode`, `ord()` on bytes, invalid escape sequences) cleaned up.
 - `make_release.py` packages both plugins from cleaned temporary copies; release zips are gitignored.
-- New `tests/` pytest suite (no calibre/Qt needed): `python -m pytest`.
+- New `tests/` pytest suite (no calibre/Qt needed): `python -m pytest`. It includes end-to-end tests that build genuinely DRM-encrypted books (Mobipocket crypto type 1, Adobe ADEPT EPUB) and check the plaintext comes back out. Verified on Python 3.10 (the interpreter calibre 5.x ships), 3.13 and 3.14; 97 of these tests fail against the pre-fix tree.
 
 ## Fixes in v10.0.0 (2021-11-17):
 
