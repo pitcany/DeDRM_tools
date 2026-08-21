@@ -420,7 +420,7 @@ class BinaryIonParser(object):
         _assert(self.localremaining <= 8, "Decimal overflow")
 
         signed = False
-        b = [ord(x) for x in self.read(self.localremaining)]
+        b = list(self.read(self.localremaining))
         if (b[0] & 0x80) != 0:
             b[0] = b[0] & 0x7F
             signed = True
@@ -428,7 +428,7 @@ class BinaryIonParser(object):
         # Convert variably sized network order integer into 64-bit little endian
         j = 0
         vb = [0] * 8
-        for i in range(len(b), -1, -1):
+        for i in range(len(b) - 1, -1, -1):
             vb[i] = b[j]
             j += 1
 
@@ -657,7 +657,7 @@ class BinaryIonParser(object):
 
         result = ""
         for i in b:
-            result += ("%02x " % ord(i))
+            result += ("%02x " % i)
 
         if len(result) > 0:
             result = result[:-1]
