@@ -19,6 +19,20 @@ DEDRM_README= 'DeDRM_plugin_ReadMe.txt'
 OBOK_SRC_DIR = 'Obok_plugin'
 OBOK_SRC_TMP_DIR = 'Obok_plugin_temp'
 OBOK_README = 'obok_plugin_ReadMe.txt'
+KRFTool="Other_Tools/KRFKeyExtractor/KRFKeyExtractor.exe"
+KRFTool28="Other_Tools/KRFKeyExtractor/KFXKeyExtractor28.exe"
+KRFTool282="Other_Tools/KRFKeyExtractor/KFXKeyExtractor282.exe"
+KFXArchiverTool291="Other_Tools/KRFKeyExtractor/KFXArchiver291.exe"
+MSIXArchiverTool="Other_Tools/KRFKeyExtractor/MSIXKFXArchiver1_23620_final.exe"
+MSIXArchiverTool64="Other_Tools/KRFKeyExtractor/MSIXKFXArchiver_x64_1_5634.exe"
+KRFFrida="Other_Tools/KRFKeyExtractor/kindleFridaInstr.py"
+KRFFridaDecr="Other_Tools/KRFKeyExtractor/kindleFridaDecrypt.py"
+KRFFrida86="Other_Tools/KRFKeyExtractor/kindledecr_x84_64"
+KRFFridaArm="Other_Tools/KRFKeyExtractor/kindledecr_arm64"
+KRFFridaAgent="Other_Tools/KRFKeyExtractor/compiled_agent.js"
+
+
+
 RELEASE_DIR = 'release'
 
 # Never ship these from the working tree (caches, editor/OS droppings, patch leftovers).
@@ -87,6 +101,51 @@ def make_release(version):
     shutil.move(OBOK_SRC_DIR+'.zip', RELEASE_DIR)
     shutil.copy(DEDRM_README, RELEASE_DIR)
     shutil.copy(OBOK_README, RELEASE_DIR)
+    try:
+        shutil.copy(KRFTool, RELEASE_DIR)
+    except:
+        pass
+    try:
+        shutil.copy(KRFTool28, RELEASE_DIR)
+    except:
+        pass    
+    try:
+        shutil.copy(KRFTool282, RELEASE_DIR)
+    except:
+        pass    
+    try:
+        shutil.copy(MSIXArchiverTool, RELEASE_DIR)
+    except:
+        pass    
+    try:
+        shutil.copy(MSIXArchiverTool64, RELEASE_DIR)
+    except:
+        pass    
+    try:
+        shutil.copy(KFXArchiverTool291, RELEASE_DIR)
+    except:
+        pass
+    try:
+        shutil.copy(KRFFrida, RELEASE_DIR)
+    except:
+        pass
+    try:
+        shutil.copy(KRFFridaDecr, RELEASE_DIR)
+    except:
+        pass        
+    try:
+        shutil.copy(KRFFrida86, RELEASE_DIR)
+    except:
+        pass
+    try:
+        shutil.copy(KRFFridaArm, RELEASE_DIR)
+    except:
+        pass
+    try:
+        shutil.copy(KRFFridaAgent, RELEASE_DIR)
+    except:
+        pass
+
     shutil.copy("ReadMe_Overview.txt", RELEASE_DIR)
 
     if version is not None:

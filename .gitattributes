@@ -1,0 +1,15 @@
+# Keep source text LF in the repository. Satsuoni's fork commits some files
+# with CRLF; merge it with `git merge -X renormalize satsuoni/master` so those
+# endings do not turn small edits into whole-file conflicts.
+*.sh     text eol=lf
+*.py     text eol=lf
+*.md     text eol=lf
+*.txt    text eol=lf
+*.yml    text eol=lf
+*.htm    text eol=lf
+*.html   text eol=lf
+*.js     text eol=lf
+*.cpp    text eol=lf
+*.h      text eol=lf
+.gitignore     text eol=lf
+.gitattributes text eol=lf

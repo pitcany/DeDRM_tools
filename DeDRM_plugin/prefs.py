@@ -16,8 +16,10 @@ try:
     from calibre.utils.config import JSONConfig
 except:
     from standalone.jsonconfig import JSONConfig
-
-from __init__ import PLUGIN_NAME
+try:
+  from __init__ import PLUGIN_NAME
+except:
+  from . import PLUGIN_NAME
 
 class DeDRM_Prefs():
     def __init__(self, json_path=None):
@@ -30,7 +32,7 @@ class DeDRM_Prefs():
 
         self.dedrmprefs.defaults['configured'] = False
         self.dedrmprefs.defaults['deobfuscate_fonts'] = True
-        self.dedrmprefs.defaults['remove_watermarks'] = False
+        self.dedrmprefs.defaults['remove_watermarks'] = True
         self.dedrmprefs.defaults['bandnkeys'] = {}
         self.dedrmprefs.defaults['adeptkeys'] = {}
         self.dedrmprefs.defaults['ereaderkeys'] = {}
@@ -42,6 +44,7 @@ class DeDRM_Prefs():
         self.dedrmprefs.defaults['adobe_pdf_passphrases'] = []
         self.dedrmprefs.defaults['adobewineprefix'] = ""
         self.dedrmprefs.defaults['kindlewineprefix'] = ""
+        self.dedrmprefs.defaults['kindleextrakeyfile'] = ""
 
         # initialise
         # we must actually set the prefs that are dictionaries and lists
