@@ -5,7 +5,7 @@ import pytest
 
 import DeDRM_plugin as plugin
 
-KINDLE_TYPES = {"prc", "mobi", "pobi", "azw", "azw1", "azw3", "azw4", "azw8", "tpz", "kfx", "kfx-zip"}
+KINDLE_TYPES = {"prc", "mobi", "pobi", "azw", "azw1", "azw3", "azw4", "azw8", "azw9", "tpz", "kfx", "kfx-zip"}
 EXPECTED_HANDLER = dict(
     {t: "KindleMobiDecrypt" for t in KINDLE_TYPES},
     pdb="eReaderDecrypt", pdf="PDFDecrypt", epub="ePubDecrypt")
