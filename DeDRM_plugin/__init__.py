@@ -149,13 +149,13 @@ PLUGIN_VERSION_TUPLE = __version.PLUGIN_VERSION_TUPLE
 
 class DeDRM(FileTypePlugin):
     name                    = PLUGIN_NAME
-    description             = "Removes DRM from Adobe Adept (including Kobo), Barnes & Noble, Amazon Kindle, Mobipocket and eReader ebooks. Credit given to i♥cabbages and The Dark Reverser for the original stand-alone scripts."
+    description             = "Removes DRM from Adobe ADEPT (including Rakuten Kobo), Barnes & Noble, Amazon Kindle, Mobipocket and eReader ebooks. Credit given to i♥cabbages and The Dark Reverser for the original stand-alone scripts."
     supported_platforms     = ['linux', 'osx', 'windows']
     author                  = "Apprentice Alf, Apprentice Harper, NoDRM, The Dark Reverser and i♥cabbages"
     version                 = PLUGIN_VERSION_TUPLE
     #minimum_calibre_version = (5, 0, 0)  # Python 3.
     minimum_calibre_version = (2, 0, 0)  # Needs Calibre 1.0 minimum. 1.X untested.
-    file_types              = set(['epub','pdf','pdb','prc','mobi','pobi','azw','azw1','azw3','azw4','azw8','tpz','kfx','kfx-zip'])
+    file_types              = set(['epub','pdf','pdb','prc','mobi','pobi','azw','azw1','azw3','azw4','azw8','azw9','tpz','kfx','kfx-zip'])
     on_import               = True
     on_preprocess           = True
     priority                = 600
@@ -238,10 +238,10 @@ class DeDRM(FileTypePlugin):
             if dedrmprefs["remove_watermarks"] is True:
                 import epubwatermark as watermark
 
-                # Remove Tolino's CDP watermark file
-                path_to_ebook = watermark.removeCDPwatermark(self, path_to_ebook) or path_to_ebook
+                # Remove watermark (Tolino's CDP or Palmknihy) files
+                path_to_ebook = watermark.removeWatermarkFiles(self, path_to_ebook) or path_to_ebook
 
-                # Remove watermarks (Amazon or LemonInk) from the OPF file
+                # Remove watermarks (Amazon, LemonInk or Palmknihy) from the OPF file
                 path_to_ebook = watermark.removeOPFwatermarks(self, path_to_ebook) or path_to_ebook
 
                 # Remove watermarks (Adobe, Pocketbook or LemonInk) from all HTML and XHTML files
@@ -929,9 +929,14 @@ class DeDRM(FileTypePlugin):
         #print serials
         androidFiles = []
         kindleDatabases = list(dedrmprefs['kindlekeys'].items())
-
         try:
-            book = k4mobidedrm.GetDecryptedBook(path_to_ebook,kindleDatabases,androidFiles,serials,pids,self.starttime)
+          opath=self.original_path_to_file
+          print("Original file path: {}".format(opath))
+        except:
+          print("Cannot get original path")
+          opath=None
+        try:
+            book = k4mobidedrm.GetDecryptedBook(path_to_ebook,kindleDatabases,androidFiles,serials,pids,self.starttime,dedrmprefs["kindleextrakeyfile"], dedrmprefs["remove_watermarks"],original_path=opath)
         except Exception as e:
             decoded = False
             # perhaps we need to get a new default Kindle for Mac/PC key
@@ -965,30 +970,47 @@ class DeDRM(FileTypePlugin):
                 if keyvalue not in dedrmprefs['kindlekeys'].values():
                     newkeys["key_{0:d}".format(i)] = keyvalue
 
-            if len(newkeys) > 0:
-                print("{0} v{1}: Found {2} new {3}".format(PLUGIN_NAME, PLUGIN_VERSION, len(newkeys), "key" if len(newkeys)==1 else "keys"))
+            if newkeys:
+                print("{0} v{1}: Recovered {2} new local Kindle {3}".format(
+                    PLUGIN_NAME, PLUGIN_VERSION, len(newkeys),
+                    "key" if len(newkeys) == 1 else "keys"))
+                # Authenticated local registration data can be saved even when the
+                # current ebook is unsupported or damaged; do not lose it on failure.
                 try:
-                    book = k4mobidedrm.GetDecryptedBook(path_to_ebook,newkeys.items(),[],[],[],self.starttime)
-                    decoded = True
-                    # store the new successful keys in the defaults
-                    print("{0} v{1}: Saving {2} new {3}".format(PLUGIN_NAME, PLUGIN_VERSION, len(newkeys), "key" if len(newkeys)==1 else "keys"))
                     i = 1
                     for keyvalue in newkeys.values():
                         while "kindle_key_{0:d}_{1:d}".format(int(time.time()), i) in dedrmprefs['kindlekeys']:
-                            i = i + 1
-                        dedrmprefs.addnamedvaluetoprefs('kindlekeys',"kindle_key_{0:d}_{1:d}".format(int(time.time()), i),keyvalue)
+                            i += 1
+                        dedrmprefs.addnamedvaluetoprefs(
+                            'kindlekeys',
+                            "kindle_key_{0:d}_{1:d}".format(int(time.time()), i),
+                            keyvalue)
                     dedrmprefs.writeprefs()
-                except Exception as e:
+                    print("{0} v{1}: Saved recovered local Kindle key(s)".format(
+                        PLUGIN_NAME, PLUGIN_VERSION))
+                except Exception:
+                    print("{0} v{1}: Could not save recovered Kindle keys".format(
+                        PLUGIN_NAME, PLUGIN_VERSION))
                     traceback.print_exc()
-                    pass
+
+                # Preserve the rest of the user's configured credentials on retry.
+                retry_keys = kindleDatabases + list(newkeys.items())
+                try:
+                    book = k4mobidedrm.GetDecryptedBook(
+                        path_to_ebook, retry_keys, androidFiles, serials, pids,
+                        self.starttime, dedrmprefs["kindleextrakeyfile"],
+                        dedrmprefs["remove_watermarks"], original_path=opath)
+                    decoded = True
+                except Exception:
+                    traceback.print_exc()
             if not decoded:
                 #if you reached here then no luck raise and exception
                 print("{0} v{1}: Ultimately failed to decrypt after {2:.1f} seconds. Read the FAQs at noDRM's repository: https://github.com/noDRM/DeDRM_tools/blob/master/FAQs.md".format(PLUGIN_NAME, PLUGIN_VERSION,time.time()-self.starttime))
                 raise DeDRMError("{0} v{1}: Ultimately failed to decrypt after {2:.1f} seconds. Read the FAQs at noDRM's repository: https://github.com/noDRM/DeDRM_tools/blob/master/FAQs.md".format(PLUGIN_NAME, PLUGIN_VERSION,time.time()-self.starttime))
 
         of = self.temporary_file(book.getBookExtension())
-        book.getFile(of.name)
         of.close()
+        book.getFile(of.name)
         book.cleanup()
         return of.name
 
@@ -1031,9 +1053,26 @@ class DeDRM(FileTypePlugin):
         self.starttime = time.time()
 
         booktype = os.path.splitext(path_to_ebook)[1].lower()[1:]
-        if booktype in ['prc','mobi','pobi','azw','azw1','azw3','azw4','azw8','tpz','kfx','kfx-zip']:
+        # no extension, so the shape comes from the file: an export leaves the
+        # fragment database bare, voucher beside it
+        relational_container = utilities.is_relational_container(path_to_ebook)
+        if booktype in ['prc','mobi','pobi','azw','azw1','azw3','azw4','azw8','azw9','tpz','kfx','kfx-zip'] or relational_container:
             # Kindle/Mobipocket
-            decrypted_ebook = self.KindleMobiDecrypt(path_to_ebook)
+            # kfx, azw8 and azw9 are in file_types, so a bare one must land here; left
+            # out, it hit "Unknown booktype" and came back unchanged. azw9 is the
+            # resource container beside the main one; the handler decides package vs
+            # DRMION/voucher
+            try:
+                decrypted_ebook = self.KindleMobiDecrypt(path_to_ebook)
+            except Exception as e:
+                if booktype not in ('kfx', 'azw8', 'azw9') and not relational_container:
+                    raise
+                # a bare container needn't be a shape this handler reads; back
+                # unchanged beats a failed import, since it already said why
+                print("{0} v{1}: The KFX handler could not decrypt this {2} file ({3}). "
+                      "Passing it back to calibre unchanged.".format(
+                          PLUGIN_NAME, PLUGIN_VERSION, booktype, e))
+                return path_to_ebook
         elif booktype == 'pdb':
             # eReader
             decrypted_ebook = self.eReaderDecrypt(path_to_ebook)
@@ -1056,7 +1095,10 @@ class DeDRM(FileTypePlugin):
         return True
 
     def config_widget(self):
-        import config
+        try:
+          import config
+        except:
+          from . import config
         return config.ConfigWidget(self.plugin_path, self.alfdir)
 
     def save_settings(self, config_widget):

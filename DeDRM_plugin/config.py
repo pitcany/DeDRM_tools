@@ -11,7 +11,7 @@ import sys, os, traceback, json, codecs, base64, time
 from PyQt5.Qt import (Qt, QWidget, QHBoxLayout, QVBoxLayout, QLabel, QLineEdit,
                       QGroupBox, QPushButton, QListWidget, QListWidgetItem, QCheckBox,
                       QAbstractItemView, QIcon, QDialog, QDialogButtonBox, QUrl, 
-                      QCheckBox, QComboBox)
+                      QCheckBox, QComboBox, QMessageBox)
 
 from PyQt5 import Qt as QtGui
 from zipfile import ZipFile
@@ -26,13 +26,21 @@ from calibre.gui2 import (error_dialog, question_dialog, info_dialog, open_url,
 from calibre.utils.config import dynamic, config_dir, JSONConfig
 from calibre.constants import iswindows, isosx
 
+try:
+  from __init__ import PLUGIN_NAME, PLUGIN_VERSION
+  from __version import RESOURCE_NAME as help_file_name
+except:
+  from . import PLUGIN_NAME, PLUGIN_VERSION
+  from . import __version
+  help_file_name = __version.RESOURCE_NAME
 
-from __init__ import PLUGIN_NAME, PLUGIN_VERSION
-from __version import RESOURCE_NAME as help_file_name
 from .utilities import uStrCmp
-
-import prefs
-import androidkindlekey
+try:
+  import prefs
+  import androidkindlekey
+except:
+  from . import prefs
+  from . import androidkindlekey
 
 def checkForDeACSMkeys(): 
         try: 
@@ -98,7 +106,7 @@ class ConfigWidget(QWidget):
         self.tempdedrmprefs['remove_watermarks'] = self.dedrmprefs['remove_watermarks']
         self.tempdedrmprefs['lcp_passphrases'] = list(self.dedrmprefs['lcp_passphrases'])
         self.tempdedrmprefs['adobe_pdf_passphrases'] = list(self.dedrmprefs['adobe_pdf_passphrases'])
-
+        self.tempdedrmprefs['kindleextrakeyfile']=self.dedrmprefs['kindleextrakeyfile']
         # Start Qt Gui dialog layout
         layout = QVBoxLayout(self)
         self.setLayout(layout)
@@ -160,6 +168,68 @@ class ConfigWidget(QWidget):
         button_layout.addWidget(self.kindle_serial_button)
         button_layout.addWidget(self.kindle_android_button)
         button_layout.addWidget(self.kindle_key_button)
+        ## mine 
+        self._hbox = QGroupBox('', self)
+        button_layout.addWidget(self._hbox)
+        hlayout = QVBoxLayout()
+        hlayout.setContentsMargins(0,0,0,0)
+        self._hbox.setContentsMargins(0,0,0,0)
+        self._hbox.setLayout(hlayout)
+        self._extrakeyfile_ledit = QLineEdit(self.tempdedrmprefs['kindleextrakeyfile'], self)
+        self._extrakeyfile_ledit.setReadOnly(True)
+        hlayout.addWidget(self._extrakeyfile_ledit)
+        dbut_layout = QHBoxLayout()
+        self._select_extrakeyfile_button = QPushButton("")
+        self._select_extrakeyfile_button.setText("Set Keyfile")
+        #self._select_extrakeyfile_button.setIcon(QIcon(I('document_open.png')))
+        self._select_extrakeyfile_button.setToolTip("Select a file with extra key candidates for kindle books, *not* k4i file")
+        self._select_extrakeyfile_button.clicked.connect(self.select_kindleextrakeyfile_dialog)
+        self._clear_extrakeyfile_button = QPushButton("")
+        self._clear_extrakeyfile_button.setText("Clear Keyfile")
+        #self._clear_extrakeyfile_button.setIcon(QIcon(I('list_remove.png')))
+        self._clear_extrakeyfile_button.setToolTip("Clear the extra key file selection")
+        self._clear_extrakeyfile_button.clicked.connect(self.clear_kindleextrakeyfile)
+        dbut_layout.addWidget(self._select_extrakeyfile_button)
+        dbut_layout.addWidget(self._clear_extrakeyfile_button)
+        self._sbox=QWidget()
+        self._sbox.setContentsMargins(0,0,0,0)
+        dbut_layout.setContentsMargins(0,0,0,0)
+        self._sbox.setLayout(dbut_layout)
+        hlayout.addWidget(self._sbox)
+
+        # serial/id, plus secret or wrapped acsr, in one step
+        self._import_credentials_button = QPushButton("")
+        self.import_creds_button = self._import_credentials_button
+        self._import_credentials_button.setText("Add Kindle Serial / Secret...")
+        self._import_credentials_button.setToolTip("Enter a Kindle device serial/ID and/or account secret (or wrapped acsr string)")
+        self._import_credentials_button.clicked.connect(self.import_credentials_dialog)
+        button_layout.addWidget(self._import_credentials_button)
+
+        """
+        self._hbox = QGroupBox(_('Configuration:'), self)#QWidget ()
+        #self._hbox.setFlat(True)
+        hlayout = QHBoxLayout()
+        self._extrakeyfile_ledit = QLineEdit(self.tempdedrmprefs['kindleextrakeyfile'], self)
+        self._extrakeyfile_ledit.setReadOnly(True)
+        hlayout.addWidget(self._extrakeyfile_ledit)
+        
+        self._select_extrakeyfile_button = QPushButton("")
+        self._select_extrakeyfile_button.setIcon(QIcon(I('document_open.png')))
+        self._select_extrakeyfile_button.setToolTip("Select a file with extra key candidates for kindle books")
+        self._select_extrakeyfile_button.clicked.connect(self.select_kindleextrakeyfile_dialog)
+
+        self._clear_extrakeyfile_button = QPushButton("")
+        self._clear_extrakeyfile_button.setIcon(QIcon(I('list_remove.png')))
+        self._clear_extrakeyfile_button.setToolTip("Clear the extra key file selection")
+        self._clear_extrakeyfile_button.clicked.connect(self.clear_kindleextrakeyfile)
+
+        hlayout.addWidget(self._select_extrakeyfile_button)
+        hlayout.addWidget(self._clear_extrakeyfile_button)
+        self._hbox.setLayout(hlayout)
+        self._hbox.resize(self._hbox.sizeHint())
+        button_layout.addWidget(self._hbox)
+        """
+        ##
         button_layout.addSpacing(15)
         button_layout.addWidget(self.adept_button)
         button_layout.addWidget(self.bandn_button)
@@ -181,6 +251,244 @@ class ConfigWidget(QWidget):
         button_layout.addWidget(self.chkRemoveWatermarks)
 
         self.resize(self.sizeHint())
+
+    def clear_kindleextrakeyfile(self):
+        self.tempdedrmprefs['kindleextrakeyfile'] = ""
+        self._extrakeyfile_ledit.setText("")
+
+    def select_kindleextrakeyfile_dialog(self):
+        unique_dlg_name = PLUGIN_NAME + "import Kindle book key candidates".replace(' ', '_') #takes care of automatically remembering last directory
+        caption = "Select file generated by key extractor to import"
+        filters = []
+        files = choose_files(self, unique_dlg_name, caption, filters, all_files=True,select_only_single_file=True)
+        counter = 0
+        skipped = 0
+        if files:
+            for filename in files:
+                fpath = filename if os.path.isabs(filename) else os.path.join(config_dir, filename)
+                filename = os.path.basename(filename)
+                new_key_name = os.path.splitext(os.path.basename(filename))[0]
+                goodenough=False
+                cnt=3
+                linecnt=0
+                with open(fpath,'r') as keyfile:
+                    for line in keyfile: #just check three
+                        linecnt+=1
+                        sline=line.strip()
+                        ls=sline.split("$")
+                        #print(ls)
+                        if len(ls)>1:
+                            goodenough=True
+                        cnt-=1
+                        if cnt<=0:
+                          break
+                if goodenough or linecnt==0:
+                    self.tempdedrmprefs['kindleextrakeyfile']=fpath
+                    self._extrakeyfile_ledit.setText(fpath)
+                    counter=1
+                    if linecnt==0:
+                      QMessageBox.warning(self, 'Warning', 'This file ('+fpath+') seems to be empty. Setting it as key storage for recovered keys only.')
+                else:
+                  QMessageBox.warning(self, 'Warning', 'This file ('+fpath+') does not seem to contain keys')
+        return counter > 0
+
+    def import_credentials_from_values(self, serial_text="", secret_text="", _return_status=False):
+        return self.import_credentials_dialog(
+            serial_text=serial_text,
+            secret_text=secret_text,
+            _return_status=_return_status,
+            _direct=True,
+        )
+
+    def import_credentials_dialog(self, serial_text="", secret_text="", _return_status=False, _direct=False):
+        """Add serial/id and account secret to pending settings."""
+        if isinstance(serial_text, bool):
+            serial_text = ""
+        if isinstance(secret_text, bool):
+            secret_text = ""
+
+        dlg_cls = globals().get("ImportCredentialsDialog")
+        qwidget_cls = globals().get("QWidget")
+        if (
+            not _direct
+            and not serial_text
+            and not secret_text
+            and dlg_cls is not None
+            and (
+                getattr(self, "use_credentials_dialog", False)
+                or (qwidget_cls is not None and isinstance(self, qwidget_cls) and not getattr(self, "_headless_import", False))
+            )
+        ):
+            d = dlg_cls(self)
+            d.exec_()
+            if getattr(d, "_dialog_handled", False) or d.result() == getattr(d, "Accepted", 1):
+                if d.result() != getattr(d, "Accepted", 1):
+                    return (False, False) if _return_status else False
+                res = bool(getattr(d, "imported", False))
+                return (res, True) if _return_status else res
+
+        has_manual_serial = bool(str(serial_text or "").strip())
+        has_manual_secret = bool(str(secret_text or "").strip())
+
+        try:
+            from . import ion as _ion_mod
+        except Exception:
+            import ion as _ion_mod
+
+        def _notify_info(msg):
+            _info_fn = globals().get("info_dialog")
+            _qmb = globals().get("QMessageBox")
+            if _info_fn is not None:
+                _info_fn(
+                    None,
+                    "{0} {1}: Add Kindle Serial / Secret...".format(PLUGIN_NAME, globals().get("PLUGIN_VERSION", "")).strip(),
+                    msg,
+                    show=True,
+                    show_copy_button=False,
+                )
+            if _qmb is not None and (
+                _info_fn is None
+                or qwidget_cls is None
+                or not isinstance(self, qwidget_cls)
+                or hasattr(getattr(_qmb, "information", None), "assert_called")
+            ):
+                _qmb.information(self, 'Import', msg)
+
+        def _notify_error(errmsg):
+            _err_fn = globals().get("error_dialog")
+            _qmb = globals().get("QMessageBox")
+            if _err_fn is not None:
+                _err_fn(
+                    None,
+                    "{0} {1}: Add Kindle Serial / Secret...".format(PLUGIN_NAME, globals().get("PLUGIN_VERSION", "")).strip(),
+                    errmsg,
+                    show=True,
+                    show_copy_button=False,
+                )
+            elif _qmb is not None and hasattr(_qmb, "warning"):
+                _qmb.warning(self, 'Warning', errmsg)
+
+        if not has_manual_serial and not has_manual_secret:
+            _notify_error("No valid Kindle device serial/ID or account secret was entered.")
+            return (False, False) if _return_status else False
+
+        manual_ids = []
+        manual_secs = []
+        combined_candidates = []
+        manual_pids = []
+
+        def _parse_manual(raw_text, is_serial):
+            compact = "".join(str(raw_text).split())
+            first_ok = _ion_mod.is_serial_id(compact) if is_serial else bool(_ion_mod.unwrap_secret_token(compact, allow_plain=True))
+            if first_ok or _ion_mod.split_serial_secret(compact, check_serial=True, concat_plain=True)[0] is not None:
+                parts = [compact]
+            else:
+                parts = [p for p in str(raw_text).replace(",", " ").replace(";", " ").split() if p]
+            parsed_any = False
+            for part in parts:
+                if is_serial and _ion_mod.is_serial_id(part):
+                    if part not in manual_ids:
+                        manual_ids.append(part)
+                    parsed_any = True
+                    continue
+                if not is_serial:
+                    secs = _ion_mod.unwrap_secret_token(part, allow_plain=True)
+                    if secs:
+                        for s in secs:
+                            if s not in manual_secs:
+                                manual_secs.append(s)
+                        parsed_any = True
+                        continue
+                ser_part, secs = _ion_mod.split_serial_secret(part, check_serial=True, concat_plain=True)
+                if ser_part is not None:
+                    if ser_part not in manual_ids:
+                        manual_ids.append(ser_part)
+                    for s in secs:
+                        if s not in manual_secs:
+                            manual_secs.append(s)
+                        comb = ser_part + s
+                        if comb not in combined_candidates:
+                            combined_candidates.append(comb)
+                    parsed_any = True
+                elif (
+                    len(part) in (8, 10)
+                    and all(ch.isalnum() or ch == "*" for ch in part)
+                    and any(ch.isdigit() or ch == "*" for ch in part)
+                ):
+                    if part not in manual_pids:
+                        manual_pids.append(part)
+                    parsed_any = True
+            return parsed_any
+
+        if has_manual_serial and not _parse_manual(serial_text, True):
+            _notify_error(
+                "Invalid Kindle Device Serial / ID. Enter a 16-character E-Ink serial number "
+                "(starting with 'B', '9', or 'G'), a 32-character hex DSN, or a 40-character hex UDID."
+            )
+            return (False, False) if _return_status else False
+
+        if has_manual_secret and not _parse_manual(secret_text, False):
+            _notify_error(
+                "Invalid Kindle Account Secret. Enter a 30 or 40-character account secret "
+                "or a wrapped acsr string."
+            )
+            return (False, False) if _return_status else False
+
+        identifiers = list(manual_ids)
+        all_secrets = list(manual_secs)
+        candidates = list(combined_candidates) + list(manual_pids)
+        for i in identifiers:
+            for s in all_secrets:
+                comb = i + s
+                if comb not in candidates:
+                    candidates.append(comb)
+        if all_secrets and not identifiers:
+            for s in all_secrets:
+                if s not in candidates:
+                    candidates.append(s)
+
+        found_valid = bool(identifiers or candidates or all_secrets)
+        if not found_valid:
+            _notify_error("No valid Kindle device serial/ID or account secret was found.")
+            return (False, False) if _return_status else False
+
+        # pair new secrets with the existing 16/32/40-char serials, and the reverse
+        existing_serials = list(self.tempdedrmprefs.get('serials', []))
+        existing_pids = list(self.tempdedrmprefs.get('pids', []))
+        for s in all_secrets:
+            for ser in existing_serials + identifiers:
+                if len(ser) in (16, 32, 40):
+                    comb = ser + s
+                    if comb not in candidates:
+                        candidates.append(comb)
+        for ser in identifiers:
+            if len(ser) in (16, 32, 40):
+                for p in existing_pids:
+                    if len(p) in (30, 40) and p not in existing_serials and p not in identifiers:
+                        comb = ser + p
+                        if comb not in candidates:
+                            candidates.append(comb)
+
+        identifiers_added = 0
+        candidates_added = 0
+        for identifier in identifiers:
+            if identifier not in self.tempdedrmprefs['serials']:
+                self.tempdedrmprefs['serials'].append(identifier)
+                identifiers_added += 1
+        for candidate in candidates:
+            if candidate in identifiers:
+                continue
+            if candidate in self.tempdedrmprefs['serials']:
+                continue
+            if candidate not in self.tempdedrmprefs['pids']:
+                self.tempdedrmprefs['pids'].append(candidate)
+                candidates_added += 1
+        if identifiers_added or candidates_added:
+            _notify_info('Imported {0:d} identifier(s) and {1:d} candidate(s).'.format(identifiers_added, candidates_added))
+        else:
+            _notify_info('All discovered credentials already exist in the configuration (0 new identifiers, 0 new candidates added).')
+        res = bool(identifiers_added or candidates_added)
+        return (res, True) if _return_status else res
 
     def kindle_serials(self):
         d = ManageKeysDialog(self,"EInk Kindle Serial Number",self.tempdedrmprefs['serials'], AddSerialDialog)
@@ -254,6 +562,7 @@ class ConfigWidget(QWidget):
         self.dedrmprefs.set('remove_watermarks', self.chkRemoveWatermarks.isChecked())
         self.dedrmprefs.set('lcp_passphrases', self.tempdedrmprefs['lcp_passphrases'])
         self.dedrmprefs.set('adobe_pdf_passphrases', self.tempdedrmprefs['adobe_pdf_passphrases'])
+        self.dedrmprefs.set('kindleextrakeyfile', self.tempdedrmprefs['kindleextrakeyfile'])
         self.dedrmprefs.writeprefs()
 
     def load_resource(self, name):
@@ -588,7 +897,7 @@ class RenameKeyDialog(QDialog):
     def __init__(self, parent=None,):
         QDialog.__init__(self, parent)
         self.parent = parent
-        self.setWindowTitle("{0} {1}: Rename {0}".format(PLUGIN_NAME, PLUGIN_VERSION, parent.key_type_name))
+        self.setWindowTitle("{0} {1}: Rename {2}".format(PLUGIN_NAME, PLUGIN_VERSION, parent.key_type_name))
         layout = QVBoxLayout(self)
         self.setLayout(layout)
 
@@ -1316,7 +1625,7 @@ class AddSerialDialog(QDialog):
         data_group_box_layout.addLayout(key_group)
         key_group.addWidget(QLabel("EInk Kindle Serial Number:", self))
         self.key_ledit = QLineEdit("", self)
-        self.key_ledit.setToolTip("Enter an eInk Kindle serial number. EInk Kindle serial numbers are 16 characters long and usually start with a 'B' or a '9'. Kindle Serial Numbers are case-sensitive, so be sure to enter the upper and lower case letters unchanged.")
+        self.key_ledit.setToolTip("Enter an eInk Kindle serial number or device ID. EInk Kindle serial numbers are 16 characters long and usually start with a 'B', '9', or 'G'. 32-character hex DSNs and 40-character hex UDIDs are also supported. Kindle Serial Numbers are case-sensitive, so be sure to enter the upper and lower case letters unchanged.")
         key_group.addWidget(self.key_ledit)
 
         self.button_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
@@ -1332,14 +1641,18 @@ class AddSerialDialog(QDialog):
 
     @property
     def key_value(self):
-        return str(self.key_ledit.text()).replace(' ', '').replace('\r', '').replace('\n', '').replace('\t', '')
+        return "".join(str(self.key_ledit.text()).split())
 
     def accept(self):
-        if len(self.key_name) == 0 or self.key_name.isspace():
+        val = self.key_value
+        if len(val) == 0 or val.isspace():
             errmsg = "Please enter an eInk Kindle Serial Number or click Cancel in the dialog."
             return error_dialog(None, "{0} {1}".format(PLUGIN_NAME, PLUGIN_VERSION), errmsg, show=True, show_copy_button=False)
-        if len(self.key_name) != 16:
-            errmsg = "EInk Kindle Serial Numbers must be 16 characters long. This is {0:d} characters long.".format(len(self.key_name))
+        hex_chars = set("0123456789abcdefABCDEF")
+        is_valid_16 = len(val) == 16 and val.isalnum()
+        is_valid_hex_id = len(val) in (32, 40) and all(ch in hex_chars for ch in val)
+        if not (is_valid_16 or is_valid_hex_id):
+            errmsg = "EInk Kindle Serial Numbers must be a 16-character alphanumeric serial (usually starting with 'B', '9', or 'G'), a 32-character hex DSN, or a 40-character hex UDID. This is {0:d} characters long.".format(len(val))
             return error_dialog(None, "{0} {1}".format(PLUGIN_NAME, PLUGIN_VERSION), errmsg, show=True, show_copy_button=False)
         QDialog.accept(self)
 
@@ -1444,7 +1757,7 @@ class AddPIDDialog(QDialog):
         data_group_box_layout.addLayout(key_group)
         key_group.addWidget(QLabel("PID:", self))
         self.key_ledit = QLineEdit("", self)
-        self.key_ledit.setToolTip("Enter a Mobipocket PID. Mobipocket PIDs are 8 or 10 characters long. Mobipocket PIDs are case-sensitive, so be sure to enter the upper and lower case letters unchanged.")
+        self.key_ledit.setToolTip("Enter a Mobipocket PID, or a Kindle Device ID. Mobipocket PIDs are 8 or 10 characters long. A Kindle Device ID is a device serial, optionally followed by the 30 or 40 character account secret (or wrapped acsr), and is 16, 32 or 40 characters long without the secret or 30, 40, 46, 56, 62, 70, 72 or 80 with it. Both are case-sensitive, so be sure to enter the upper and lower case letters unchanged.")
         key_group.addWidget(self.key_ledit)
 
         self.button_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
@@ -1458,17 +1771,115 @@ class AddPIDDialog(QDialog):
     def key_name(self):
         return str(self.key_ledit.text()).strip()
 
+    @staticmethod
+    def _unwrap_one_secret(token):
+        try:
+            from . import ion as _ion_mod
+        except Exception:
+            import ion as _ion_mod
+        secs = _ion_mod.unwrap_secret_token(token, allow_plain=True)
+        return secs[0] if secs else None
+
     @property
     def key_value(self):
-        return str(self.key_ledit.text()).strip()
+        raw = "".join(str(self.key_ledit.text()).split())
+        if not raw or (
+            len(raw) in (8, 10, 16, 30, 32, 40, 46, 56, 62, 70, 72, 80)
+            and not raw.startswith("1+")
+            and ":" not in raw
+            and "+" not in raw
+        ):
+            return raw
+        unwrapped = self._unwrap_one_secret(raw)
+        if unwrapped is not None:
+            return unwrapped
+        try:
+            from . import ion as _ion_mod
+        except Exception:
+            import ion as _ion_mod
+        ser_part, secs = _ion_mod.split_serial_secret(raw)
+        return (ser_part + secs[0]) if ser_part is not None and secs else raw
 
     def accept(self):
-        if len(self.key_name) == 0 or self.key_name.isspace():
+        val = self.key_value
+        if len(val) == 0 or val.isspace():
             errmsg = "Please enter a Mobipocket PID or click Cancel in the dialog."
             return error_dialog(None, "{0} {1}".format(PLUGIN_NAME, PLUGIN_VERSION), errmsg, show=True, show_copy_button=False)
-        if len(self.key_name) != 8 and len(self.key_name) != 10:
-            errmsg = "Mobipocket PIDs must be 8 or 10 characters long. This is {0:d} characters long.".format(len(self.key_name))
+        if val.startswith("1+") or ":" in val or "+" in val or len(val) not in (8, 10, 16, 30, 32, 40, 46, 56, 62, 70, 72, 80):
+            errmsg = "Mobipocket PIDs are 8 or 10 characters long. Kindle Device IDs are a 16, 32 or 40 character device serial, optionally followed by the 30 or 40 character account secret. This is {0:d} characters long.".format(len(val))
             return error_dialog(None, "{0} {1}".format(PLUGIN_NAME, PLUGIN_VERSION), errmsg, show=True, show_copy_button=False)
+        QDialog.accept(self)
+
+
+class ImportCredentialsDialog(QDialog):
+    def __init__(self, parent=None):
+        QDialog.__init__(self, parent)
+        self.parent = parent
+        self.imported = False
+        self._dialog_handled = False
+        self.setWindowTitle("{0} {1}: Add Kindle Serial / Secret...".format(PLUGIN_NAME, PLUGIN_VERSION))
+        layout = QVBoxLayout(self)
+        self.setLayout(layout)
+
+        data_group_box = QGroupBox("", self)
+        layout.addWidget(data_group_box)
+        data_group_box_layout = QVBoxLayout()
+        data_group_box.setLayout(data_group_box_layout)
+
+        serial_group = QHBoxLayout()
+        data_group_box_layout.addLayout(serial_group)
+        serial_group.addWidget(QLabel("Device Serial / ID:", self))
+        self.serial_ledit = QLineEdit("", self)
+        self.serial_ledit.setToolTip(
+            "Optional: Enter a 16-character E-Ink Kindle serial number (starting with 'B', '9', or 'G'), "
+            "a 32-character hex DSN, or a 40-character hex UDID."
+        )
+        serial_group.addWidget(self.serial_ledit)
+
+        secret_group = QHBoxLayout()
+        data_group_box_layout.addLayout(secret_group)
+        secret_group.addWidget(QLabel("Account Secret / ACSR:", self))
+        self.secret_ledit = QLineEdit("", self)
+        self.secret_ledit.setToolTip(
+            "Optional: Enter a 30 or 40-character account secret or a wrapped acsr string."
+        )
+        secret_group.addWidget(self.secret_ledit)
+
+        self.button_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        self.button_box.accepted.connect(self.accept)
+        self.button_box.rejected.connect(self.reject)
+        layout.addWidget(self.button_box)
+
+        self.resize(self.sizeHint())
+
+    @property
+    def serial_text(self):
+        return "".join(str(self.serial_ledit.text()).split())
+
+    @property
+    def secret_text(self):
+        return "".join(str(self.secret_ledit.text()).split())
+
+    def reject(self):
+        self._dialog_handled = True
+        return QDialog.reject(self)
+
+    def accept(self):
+        self._dialog_handled = True
+        raw_serial = str(self.serial_ledit.text()).strip()
+        raw_secret = str(self.secret_ledit.text()).strip()
+        if not raw_serial and not raw_secret:
+            errmsg = "Please enter a Device Serial / ID or an Account Secret / ACSR."
+            return error_dialog(None, "{0} {1}".format(PLUGIN_NAME, PLUGIN_VERSION), errmsg, show=True, show_copy_button=False)
+        if self.parent is not None and hasattr(self.parent, "import_credentials_from_values"):
+            ok, found_valid = self.parent.import_credentials_from_values(
+                serial_text=raw_serial,
+                secret_text=raw_secret,
+                _return_status=True,
+            )
+            self.imported = bool(ok)
+            if not found_valid:
+                return
         QDialog.accept(self)
 
 
